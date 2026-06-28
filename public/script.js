@@ -1,5 +1,5 @@
 // ── STATE ──
-let map, userMarker, userLat, userLng;
+let map, userMarker, userLat, userLng, routingControl;
 let nearbyMarkers = [];
 let lastKnownAddress = "Location unavailable";
 let currentSOSTab = 'emergency';
@@ -109,9 +109,13 @@ function searchDestination() {
       nearbyMarkers.push(L.marker([dLat,dLng],{icon:destIcon}).addTo(map)
         .bindPopup(`<b>🏁 Destination</b><br>${dest.display_name.split(',').slice(0,3).join(', ')}`));
       if (userLat && userLng) {
-        nearbyMarkers.push(L.polyline([[userLat,userLng],[dLat,dLng]],
-          {color:'#2d8cff',weight:3,opacity:0.7,dashArray:'8,6'}).addTo(map));
-        map.fitBounds([[userLat,userLng],[dLat,dLng]],{padding:[40,40]});
+        if (routingControl) map.removeControl(routingControl);
+        routingControl = L.Routing.control({
+          waypoints: [L.latLng(userLat,userLng), L.latLng(dLat,dLng)],
+          lineOptions: { styles: [{color:'#2d8cff',opacity:0.8,weight:5}] },
+          createMarker: (i,wp) => i===0 ? L.marker(wp.latLng,{icon:userIcon}) : L.marker(wp.latLng,{icon:destIcon}),
+          routeWhileDragging: false, addWaypoints: false, draggableWaypoints: false, fitSelectedRoutes: true
+        }).addTo(map);
       } else { map.setView([dLat,dLng],14); }
       showToast(`✅ Destination: ${dest.display_name.split(',')[0]}`);
     }).catch(()=>showToast("❌ No internet — cannot search"));
@@ -127,7 +131,7 @@ function findNearby(type) {
   document.getElementById(`qb-${type}`)?.classList.add('active-filter');
 
   const qFilter = overpassQuery[type];
-  const radius = 5000;
+  const radius = 15000;
   const q = `[out:json][timeout:12];(node[${qFilter}](around:${radius},${userLat},${userLng});way[${qFilter}](around:${radius},${userLat},${userLng}););out center 8;`;
 
   showToast("🔍 Finding nearby…");
@@ -292,4 +296,3 @@ function showToast(msg) {
 }
 
 document.getElementById('dest-input').addEventListener('keydown', e=>{ if(e.key==='Enter') searchDestination(); });
-
