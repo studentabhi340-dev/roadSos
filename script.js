@@ -295,4 +295,5 @@ function showToast(msg) {
   setTimeout(()=>t.classList.remove('show'),3000);
 }
 
+
 document.getElementById('dest-input').addEventListener('keydown', e=>{ if(e.key==='Enter') searchDestination(); });
