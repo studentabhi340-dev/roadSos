@@ -13,9 +13,14 @@
 
   /* HEADER */
   header {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:10px 16px; background:var(--surface);
-    border-bottom:1px solid var(--border); z-index:1000; flex-shrink:0;
+    display:flex; 
+    align-items:center; 
+    justify-content:space-between;
+    padding:10px 16px; 
+    background:var(--surface);
+    border-bottom:1px solid var(--border); 
+    z-index:1000; 
+    flex-shrink:0;
   }
   .logo { font-family:'Rajdhani',sans-serif; font-size:1.5rem; font-weight:700; letter-spacing:1px; color:var(--red); }
   .logo span { color:var(--text); }
@@ -231,3 +236,8 @@
   }
   .leaflet-popup-tip { background:var(--surface2)!important; }
   .leaflet-popup-content { font-family:'DM Sans',sans-serif; font-size:0.82rem; }
+
+  /*leaflet-routing-machine tweaks*/
+  .leaflet-routing-container{
+    display:none;
+}
