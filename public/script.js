@@ -1,5 +1,6 @@
 // ── STATE ──
 let map, userMarker, userLat, userLng, routingControl;
+let watchId = null;
 let nearbyMarkers = [];
 let lastKnownAddress = "Location unavailable";
 let currentSOSTab = 'emergency';
@@ -45,9 +46,16 @@ const overpassQuery = {
 
 // ── GEOLOCATION ──
 function getLocation() {
-  if (!navigator.geolocation) { setStatus("GPS not supported"); useCachedLocation(); return; }
-  navigator.geolocation.getCurrentPosition(onLocationSuccess, onLocationError,
-    { enableHighAccuracy:true, timeout:10000, maximumAge:30000 });
+  if (!navigator.geolocation) { 
+    setStatus("GPS not supported"); 
+    useCachedLocation(); 
+    return; }
+    if (watchId) {
+      navigator.geolocation.clearWatch(watchId);
+    }
+
+  watchId = navigator.geolocation.watchPosition(onLocationSuccess, onLocationError,
+    { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
 }
 
 function onLocationSuccess(pos) {
@@ -55,7 +63,9 @@ function onLocationSuccess(pos) {
   userLng = pos.coords.longitude;
   localStorage.setItem('roadsos_lat', userLat);
   localStorage.setItem('roadsos_lng', userLng);
-  map.setView([userLat, userLng], 15);
+  if(!userMarker) {
+     map.setView([userLat, userLng], 15);
+  }
   if (userMarker) map.removeLayer(userMarker);
   userMarker = L.marker([userLat, userLng], { icon: userIcon })
     .addTo(map).bindPopup('<b>📍 You are here</b>').openPopup();
@@ -89,7 +99,7 @@ function reverseGeocode(lat, lng) {
 
 function setStatus(t) { document.getElementById('status-text').textContent = t; }
 getLocation();
-setInterval(getLocation, 30000);
+
 
 // ── DESTINATION SEARCH ──
 function searchDestination() {
@@ -158,7 +168,7 @@ function clearNearbyMarkers() {
   nearbyMarkers.forEach(m=>map.removeLayer(m));
   nearbyMarkers=[];
 }
-
+/*
 // ── SOS ──
 function triggerSOS() {
   document.getElementById('sos-modal').classList.add('active');
@@ -176,6 +186,76 @@ function triggerSOS() {
   // Default tab: emergency
   switchSOSTab('emergency', document.querySelector('.tab-btn'));
 }
+*/
+
+function triggerSOS() {
+  // Start 5-second countdown before firing
+  startSOSCountdown();
+}
+
+function startSOSCountdown() {
+  let countdown = 10;
+  const overlay = document.createElement('div');
+  overlay.id = 'sos-countdown';
+  overlay.innerHTML = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+      <div style="font-size:5rem;font-weight:900;color:#e8001c;font-family:Rajdhani,sans-serif"
+        id="sos-count-num">10</div>
+      <div style="color:#fff;font-size:1.1rem;font-family:Rajdhani,sans-serif;letter-spacing:2px">
+        SOS ACTIVATING…</div>
+      <button onclick="cancelSOSCountdown()"
+        style="margin-top:12px;background:#1c2029;color:#eef0f4;border:1px solid rgba(255,255,255,0.1);
+        padding:10px 28px;border-radius:50px;font-size:1rem;cursor:pointer;font-family:DM Sans,sans-serif">
+        ✕ Cancel
+      </button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  window._sosTimer = setInterval(() => {
+    countdown--;
+    const el = document.getElementById('sos-count-num');
+    if (el) el.textContent = countdown;
+    if (countdown <= 0) {
+      cancelSOSCountdown();
+      fireSOS();
+    }
+  }, 1000);
+}
+
+function cancelSOSCountdown() {
+  clearInterval(window._sosTimer);
+  const el = document.getElementById('sos-countdown');
+  if (el) el.remove();
+  showToast("SOS cancelled");
+}
+
+function fireSOS() {
+  document.getElementById('sos-modal').classList.add('active');
+  document.getElementById('sos-time').textContent = `Activated at ${new Date().toLocaleTimeString()}`;
+  document.getElementById('sos-location').textContent =
+    lastKnownAddress || `${userLat?.toFixed(5)}, ${userLng?.toFixed(5)}` || "Fetching…";
+
+  const alertEl = document.getElementById('family-alert-text');
+
+  if (contact.name && contact.number) {
+    const lat = userLat?.toFixed(5) || 'unknown';
+    const lng = userLng?.toFixed(5) || 'unknown';
+    const mapsLink = `https://maps.google.com/?q=${lat},${lng}`;
+    const address = lastKnownAddress || `${lat}, ${lng}`;
+    const smsBody = `🆘 EMERGENCY! I need help immediately.\n📍 My location: ${address}\n🗺️ Map: ${mapsLink}\n— Sent via RoadSoS`;
+
+    window.open(`sms:${contact.number}?body=${encodeURIComponent(smsBody)}`, '_self');
+    alertEl.innerHTML = `✅ SMS opened for <b>${contact.name}</b> (${contact.number}) — press Send!`;
+  } else {
+    alertEl.innerHTML = `⚠️ No contact set — <u onclick="closeSOS();openContactModal()" style="cursor:pointer">Add one now</u>`;
+    showToast("⚠️ Set an emergency contact first!");
+  }
+
+  switchSOSTab('emergency', document.querySelector('.tab-btn'));
+}
+
 
 function switchSOSTab(tab, btnEl) {
   currentSOSTab = tab;
