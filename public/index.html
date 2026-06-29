@@ -116,5 +116,11 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<script>
+  // Register service worker for offline tile + asset caching
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+</script>
 </body>
 </html>
