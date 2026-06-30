@@ -12,7 +12,7 @@ const nearbyCache = {};   // key: "type_lat_lng" → { ts, elements }
 const CACHE_TTL = 5 * 60 * 1000; // 5 min
 let reverseGeocodeTimer = null;   // debounce reverse geocode calls
 
-let contact = JSON.parse(localStorage.getItem('roadsos_contact') || '{"name":"","number":""}');
+let contact = JSON.parse(localStorage.getItem('roadsos_contact') || '{"contacts":[]}');
 let cachedLat = parseFloat(localStorage.getItem('roadsos_lat') || '0');
 let cachedLng = parseFloat(localStorage.getItem('roadsos_lng') || '0');
 updateContactDisplay();
@@ -318,36 +318,63 @@ function startSOSCountdown() {
   `;
   document.body.appendChild(overlay);
 
+  // Beep + buzz immediately when countdown starts
+  playSOSAlarm();
+  if (navigator.vibrate) navigator.vibrate(100);
+
   window._sosTimer = setInterval(() => {
     countdown--;
     const el = document.getElementById('sos-count-num');
     if (el) el.textContent = countdown;
-    if (countdown <= 0) { cancelSOSCountdown(); fireSOS(); }
+    if (countdown <= 0) {
+      cancelSOSCountdown(true);
+      fireSOS();
+    } else {
+      playSOSAlarm();
+      if (navigator.vibrate) navigator.vibrate(100);
+    }
   }, 1000);
 }
 
-function cancelSOSCountdown() {
+function cancelSOSCountdown(silent = false) {
   clearInterval(window._sosTimer);
   const el = document.getElementById('sos-countdown');
   if (el) el.remove();
-  showToast("SOS cancelled");
+  if (!silent) showToast("SOS cancelled");
 }
 
 function fireSOS() {
+  if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
+  fireSOSAlarm();
+
   document.getElementById('sos-modal').classList.add('active');
   document.getElementById('sos-time').textContent = `Activated at ${new Date().toLocaleTimeString()}`;
   document.getElementById('sos-location').textContent =
     lastKnownAddress || `${userLat?.toFixed(5)}, ${userLng?.toFixed(5)}` || "Fetching…";
 
   const alertEl = document.getElementById('family-alert-text');
-  if (contact.name && contact.number) {
-    const lat = userLat?.toFixed(5) || 'unknown';
-    const lng = userLng?.toFixed(5) || 'unknown';
-    const mapsLink = `https://maps.google.com/?q=${lat},${lng}`;
-    const address = lastKnownAddress || `${lat}, ${lng}`;
-    const smsBody = `🆘 EMERGENCY! I need help immediately.\n📍 My location: ${address}\n🗺️ Map: ${mapsLink}\n— Sent via RoadSoS`;
-    window.open(`sms:${contact.number}?body=${encodeURIComponent(smsBody)}`, '_self');
-    alertEl.innerHTML = `✅ SMS opened for <b>${contact.name}</b> (${contact.number}) — press Send!`;
+  const lat = userLat?.toFixed(5) || 'unknown';
+  const lng = userLng?.toFixed(5) || 'unknown';
+  const mapsLink = `https://maps.google.com/?q=${lat},${lng}`;
+  const address = lastKnownAddress || `${lat}, ${lng}`;
+  const smsBody = `🆘 EMERGENCY! I need help immediately.\n📍 My location: ${address}\n🗺️ Map: ${mapsLink}\n— Sent via RoadSoS`;
+
+  if (contact.contacts && contact.contacts.length) {
+    alertEl.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px;width:100%">
+        <div style="font-size:0.8rem;color:var(--muted)">Tap each to alert via WhatsApp:</div>
+        ${contact.contacts.map(c => {
+          const waNumber = c.number.replace(/\D/g, '');
+          const waLink = `https://wa.me/${waNumber}?text=${encodeURIComponent(smsBody)}`;
+          return `<a href="${waLink}" target="_blank"
+            style="background:#25D366;color:#fff;text-align:center;padding:10px;
+            border-radius:10px;font-weight:700;font-family:Rajdhani,sans-serif;
+            font-size:1rem;text-decoration:none;display:block">
+            💬 Alert ${c.name}
+          </a>`;
+        }).join('')}
+      </div>
+    `;
   } else {
     alertEl.innerHTML = `⚠️ No contact set — <u onclick="closeSOS();openContactModal()" style="cursor:pointer">Add one now</u>`;
     showToast("⚠️ Set an emergency contact first!");
@@ -464,23 +491,38 @@ function closeSOS() { document.getElementById('sos-modal').classList.remove('act
 
 // ── CONTACT ──
 function openContactModal() {
-  document.getElementById('c-name').value = contact.name||'';
-  document.getElementById('c-number').value = contact.number||'';
+  const contacts = contact.contacts || [];
+  for (let i = 1; i <= 3; i++) {
+    const c = contacts[i - 1] || {};
+    document.getElementById(`c-name-${i}`).value = c.name || '';
+    document.getElementById(`c-number-${i}`).value = c.number || '';
+  }
   document.getElementById('contact-modal').classList.add('active');
 }
 function closeContactModal() { document.getElementById('contact-modal').classList.remove('active'); }
 function saveContact() {
-  const name = document.getElementById('c-name').value.trim();
-  const number = document.getElementById('c-number').value.trim();
-  if (!name||!number) return showToast("Please fill both fields");
-  contact = {name, number};
+  const contacts = [];
+  for (let i = 1; i <= 3; i++) {
+    const name = document.getElementById(`c-name-${i}`)?.value.trim();
+    const number = document.getElementById(`c-number-${i}`)?.value.trim();
+    if (name && number) contacts.push({ name, number });
+  }
+  if (!contacts.length) return showToast("Add at least one contact");
+  contact = { contacts };
   localStorage.setItem('roadsos_contact', JSON.stringify(contact));
-  updateContactDisplay(); closeContactModal();
-  showToast(`✅ Contact saved: ${name}`);
+  updateContactDisplay();
+  closeContactModal();
+  showToast(`✅ ${contacts.length} contact(s) saved`);
 }
 function updateContactDisplay() {
-  document.getElementById('contact-name-display').textContent = contact.name||'Add Emergency Contact';
-  document.getElementById('contact-number-display').textContent = contact.number||'Tap edit to set →';
+  const contacts = contact.contacts || [];
+  if (contacts.length) {
+    document.getElementById('contact-name-display').textContent = contacts.map(c => c.name).join(', ');
+    document.getElementById('contact-number-display').textContent = `${contacts.length} emergency contact(s) saved`;
+  } else {
+    document.getElementById('contact-name-display').textContent = 'Add Emergency Contact';
+    document.getElementById('contact-number-display').textContent = 'Tap edit to set →';
+  }
 }
 
 // ── UTILS ──
@@ -497,3 +539,58 @@ function showToast(msg) {
 }
 
 document.getElementById('dest-input').addEventListener('keydown', e => { if(e.key==='Enter') searchDestination(); });
+
+// ── SHAKE TO SOS ──
+(function() {
+  let lastShake = 0;
+  window.addEventListener('devicemotion', e => {
+    const a = e.accelerationIncludingGravity;
+    if (!a) return;
+    const force = Math.abs(a.x) + Math.abs(a.y) + Math.abs(a.z);
+    const now = Date.now();
+    if (force > 40 && now - lastShake > 5000) {
+      lastShake = now;
+      showToast("📳 Shake detected — starting SOS…");
+      triggerSOS();
+    }
+  });
+})();
+
+// Soft beep played on each countdown tick
+function playSOSAlarm() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 660;
+    o.type = 'sine';
+    g.gain.setValueAtTime(0.2, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    o.start(ctx.currentTime);
+    o.stop(ctx.currentTime + 0.15);
+  } catch(e) {}
+}
+
+// Urgent 5-beep alarm played once SOS actually fires
+function fireSOSAlarm() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const beep = (freq, start, duration) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = freq;
+      o.type = 'square';
+      g.gain.setValueAtTime(0.3, ctx.currentTime + start);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
+      o.start(ctx.currentTime + start);
+      o.stop(ctx.currentTime + start + duration);
+    };
+    beep(880, 0,    0.2);
+    beep(880, 0.25, 0.2);
+    beep(880, 0.5,  0.2);
+    beep(880, 0.75, 0.2);
+    beep(880, 1.0,  0.2);
+  } catch(e) {}
+}
