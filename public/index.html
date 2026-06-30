@@ -99,15 +99,42 @@
 <!-- CONTACT MODAL -->
 <div class="modal-overlay" id="contact-modal">
   <div class="contact-modal">
-    <h3>📞 Emergency Contact</h3>
+    <h3>📞 Emergency Contacts</h3>
     <div class="field-group">
+      <div style="color:var(--muted);font-size:0.75rem;padding:4px 0;border-bottom:1px solid var(--border);margin-bottom:4px">
+        👤 Contact 1
+      </div>
       <div>
-        <label>Contact Name</label>
-        <input type="text" id="c-name" placeholder="e.g. Mom, Dad, Rahul">
+        <label>Name</label>
+        <input type="text" id="c-name-1" placeholder="e.g. Mom">
       </div>
       <div>
         <label>Phone Number</label>
-        <input type="tel" id="c-number" placeholder="+91 985245****">
+        <input type="tel" id="c-number-1" placeholder="+91 XXXXXXXXXX">
+      </div>
+
+      <div style="color:var(--muted);font-size:0.75rem;padding:4px 0;border-bottom:1px solid var(--border);margin-bottom:4px;margin-top:8px">
+        👤 Contact 2
+      </div>
+      <div>
+        <label>Name</label>
+        <input type="text" id="c-name-2" placeholder="e.g. Dad">
+      </div>
+      <div>
+        <label>Phone Number</label>
+        <input type="tel" id="c-number-2" placeholder="+91 XXXXXXXXXX">
+      </div>
+
+      <div style="color:var(--muted);font-size:0.75rem;padding:4px 0;border-bottom:1px solid var(--border);margin-bottom:4px;margin-top:8px">
+        👤 Contact 3
+      </div>
+      <div>
+        <label>Name</label>
+        <input type="text" id="c-name-3" placeholder="e.g. Friend">
+      </div>
+      <div>
+        <label>Phone Number</label>
+        <input type="tel" id="c-number-3" placeholder="+91 XXXXXXXXXX">
       </div>
     </div>
     <button class="btn-save" onclick="saveContact()">Save Contact</button>
